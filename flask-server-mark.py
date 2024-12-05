@@ -34,7 +34,7 @@ def home():
     return jsonify({'status': 'up'})
 
 @app.route('/classify', methods=['POST'])
-def classify_image():
+def classify():
     '''Given an image, generate a predicted label'''
     
     # Check if the request contains an image file 
