@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import sys, os
+import sys, os, time
 from flask import Flask, request, jsonify
 
 from keras.preprocessing import image
@@ -74,16 +74,18 @@ def submit_image():
         return jsonify({'error': 'Label is required'}), 400
 
     # Save the image to a specific directory
-    save_dir = '~/images'
+    save_dir = '/home/ec2-user/images'
     os.makedirs(save_dir, exist_ok=True)
 
-    timestamp = time.time()
-    
-    image_filename = os.path.join(save_dir, f'{image.filename}_{timestamp}.jpg')
+    timestamp = str(time.time())
+    timestamp = timestamp.replace('.', '')
+
+    name = f'{os.path.splitext(image.filename)[0]}_{timestamp}'
+    image_filename = os.path.join(save_dir, f'{name}.jpg')
     image.save(image_filename)
 
     # Optionally save the label in a text file (if needed)
-    label_filename = os.path.splitext(image.filename)[0] + '_label.txt'
+    label_filename = f'{name}.txt'
     label_filepath = os.path.join(save_dir, label_filename)
 
     with open(label_filepath, 'w') as label_file:
