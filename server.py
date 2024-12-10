@@ -56,7 +56,7 @@ class_indices = get_class_indices()
 class_labels = {v: k for k, v in class_indices.items()}
 
 # Generate images folder and subfolders to store new training data
-IMAGE_FOLDER = '/home/ec2-user/images'
+IMAGE_FOLDER = '/home/ec2-user/training_images'
 for class_label in class_labels.values():
     subfolder = os.path.join(IMAGE_FOLDER, class_label)
     os.makedirs(subfolder, exist_ok=True)
@@ -140,7 +140,7 @@ def submit():
     os.makedirs(save_dir, exist_ok=True)
 
     timestamp = str(time.time()).replace('.', '')
-    image_filename = os.path.join(save_dir, f"{timestamp}.jpg")
+    image_filename = os.path.join(save_dir, f"new_{timestamp}.jpg")
     image.save(image_filename)
 
     return jsonify({
@@ -156,7 +156,7 @@ def training_data_check():
     image_count = 0
     for class_label in class_labels.values():
         subfolder = os.path.join(IMAGE_FOLDER, class_label)
-        image_count += sum(os.path.isfile(os.path.join(subfolder, f)) for f in os.listdir(subfolder)) 
+        image_count += sum(os.path.isfile(os.path.join(subfolder, f)) and f.startswith("new") for f in os.listdir(subfolder)) 
 
     return jsonify({'new-image-count': image_count}), 200
 
