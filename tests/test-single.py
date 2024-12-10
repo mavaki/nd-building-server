@@ -23,7 +23,7 @@ if __name__ == "__main__":
     test_dir = '/home/ec2-user/training_images'
 
     # Load the trained model
-    model = tf.keras.models.load_model("building_classifier_model.h5")
+    model = tf.keras.models.load_model("../building_classifier_model.h5")
 
     # Preprocess the test data
     test_datagen = ImageDataGenerator(rescale=1.0/255)
