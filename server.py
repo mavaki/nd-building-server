@@ -170,8 +170,6 @@ def training_data():
     return send_file(
         zip_data,
         mimetype='application/zip',
-        as_attachment=True,
-        download_name='data.zip'
     ), 200
 
 
