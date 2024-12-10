@@ -33,8 +33,31 @@ def register_with_catalog(name, port):
 ip = subprocess.run(['dig', 'ANY','+short', '@resolver2.opendns.com', 'myip.opendns.com'], capture_output=True, text=True).stdout.strip()
 register_with_catalog(ip, '8080')
 
+def find_models():
+    models = []
+    for file in os.listdir('.'):
+        if file.startswith('model_') and file.endswith('.h5'):
+            try:
+                timestamp = int(file[6:-3])
+                models.append((file, timestamp))
+            except ValueError:
+                continue
+
+    return models
+
+# Find the building classifier model
+models = find_models()
+newest_model, timestamp = sorted(models, key=lambda model_info: model_info[1])[-1]
+MODEL_TIMESTAMP = timestamp
+
+# Remove old models
+for model, timestamp in models:
+    if timestamp != MODEL_TIMESTAMP and timestamp != '0':
+        os.remove(model)
+
 # Load the building classifier model
-model = load_model("building_classifier_model.h5")
+model = load_model(newest_model)
+print(f'Loaded model with timestamp {MODEL_TIMESTAMP}')
 
 # Define a Flask app
 app = Flask(__name__)
@@ -97,7 +120,7 @@ def classify():
 
     # Predict class
     try:
-        predicted_label, predicted_confidence = predict_image(model, image_filename)
+        predicted_label, predicted_confidence = predict_image(model, MODEL_TIMESTAMP, image_filename)
         print('prediction:', predicted_label)
         return jsonify({
             'label': predicted_label,
@@ -172,6 +195,34 @@ def training_data():
         mimetype='application/zip',
     ), 200
 
+@app.route('/update-model', methods=['POST'])
+def update_model():
+    if 'model' not in request.files:
+        return jsonify({"error": "please include the new model"}), 400
+
+    new_model = request.files['model']
+    filename = new_model.filename
+
+    print(f'New model received with name {filename}')
+
+    global model
+    global MODEL_TIMESTAMP
+
+    if not new_model or filename == '' or filename.rsplit('.', 1)[1].lower() != 'h5':
+        return jsonify({"error": "invalid model"}), 400
+    if 'model_' not in filename or not filename[6:-3].isdigit() or int(filename[6:-3]) < MODEL_TIMESTAMP:
+        return jsonify({"error": "outdated model"}), 400
+
+    output_path = os.path.join(".", filename)
+    new_model.save(output_path)
+
+    old_timestamp = MODEL_TIMESTAMP
+    model = load_model(output_path)
+    MODEL_TIMESTAMP = int(filename[6:-3])
+    if MODEL_TIMESTAMP != '0':
+        os.remove(os.path.join(".", f"model_{old_timestamp}.h5"))
+
+    return jsonify({"message": "model updated succesfully"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, threaded=True)
