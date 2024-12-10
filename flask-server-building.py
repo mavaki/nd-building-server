@@ -103,9 +103,7 @@ def submit_image():
         label_file.write(label)
 
     return jsonify({
-        'message': 'Image and label saved successfully',
-        'image_path': image_filename,
-        'label_path': label_filepath
+        'message': 'Image and label saved successfully'
     }), 200
 
 if __name__ == '__main__':
