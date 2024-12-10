@@ -1,11 +1,13 @@
 import os
 import time
 import numpy as np
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import threading, subprocess, socket, json
+import io
+import zipfile
 
 def register_with_catalog(name, port):
     # Recall function every 60 seconds
@@ -107,6 +109,17 @@ def classify():
         # Clean up
         os.remove(image_filename)
 
+def zip_folder(folder_path):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, start=folder_path)  # Preserve folder structure
+                zip_file.write(file_path, arcname)
+    zip_buffer.seek(0)
+    return zip_buffer
+
 @app.route('/submit', methods=['POST'])
 def submit():
     """Save given image and label to directory for future model training."""
@@ -134,5 +147,33 @@ def submit():
         'message': 'Image added to training data'
     }), 200
 
+@app.route('/training-data-check', methods=['GET'])
+def training_data_check():
+    if not os.path.exists(IMAGE_FOLDER):
+        return jsonify({"new-image-count": 0})
+
+    # Count how many images have been received 
+    image_count = 0
+    for class_label in class_labels.values():
+        subfolder = os.path.join(IMAGE_FOLDER, class_label)
+        image_count += sum(os.path.isfile(os.path.join(subfolder, f)) for f in os.listdir(subfolder)) 
+
+    return jsonify({'new-image-count': image_count}), 200
+
+@app.route('/training-data', methods=['GET'])
+def training_data():
+    if not os.path.exists(IMAGE_FOLDER):
+        return jsonify({"error": 0})
+
+    # Zip the training data
+    zip_data = zip_folder(IMAGE_FOLDER)
+    return send_file(
+        zip_data,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name='data.zip'
+    ), 200
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080)
