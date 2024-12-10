@@ -60,7 +60,7 @@ def classify():
 
     # Save the image temporarily
     image = request.files['image']
-    image_filename = f"tmp_{int(time.time())}.jpg"
+    image_filename = f"tmp_{time.time_ns()}.jpg"
     image.save(image_filename)
 
     # Predict class
