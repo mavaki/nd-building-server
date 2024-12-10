@@ -120,7 +120,7 @@ def classify():
 
     # Predict class
     try:
-        predicted_label, predicted_confidence = predict_image(model, MODEL_TIMESTAMP, image_filename)
+        predicted_label, predicted_confidence = predict_image(model, image_filename)
         print('prediction:', predicted_label)
         return jsonify({
             'label': predicted_label,
@@ -219,7 +219,7 @@ def update_model():
     old_timestamp = MODEL_TIMESTAMP
     model = load_model(output_path)
     MODEL_TIMESTAMP = int(filename[6:-3])
-    if MODEL_TIMESTAMP != '0':
+    if old_timestamp != '0':
         os.remove(os.path.join(".", f"model_{old_timestamp}.h5"))
 
     return jsonify({"message": "model updated succesfully"}), 200
