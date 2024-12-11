@@ -9,6 +9,8 @@ import threading, subprocess, socket, json
 import io
 import zipfile
 
+PORT_NUM = 8080
+
 def register_with_catalog(name, port):
     # Recall function every 60 seconds
     t = threading.Timer(60.0, register_with_catalog, args=[name, port]).start()
@@ -29,9 +31,11 @@ def register_with_catalog(name, port):
     sock.sendall(json.dumps(entry).encode())
     sock.close()
 
-# Get ip and send to catalog server
+# Get IP address
 ip = subprocess.run(['dig', 'ANY','+short', '@resolver2.opendns.com', 'myip.opendns.com'], capture_output=True, text=True).stdout.strip()
-register_with_catalog(ip, '8080')
+
+# Send IP/port to catalog server
+register_with_catalog(ip, PORT_NUM)
 
 def find_models():
     models = []
@@ -234,4 +238,4 @@ def update_model():
     return jsonify({"message": "model updated succesfully"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, threaded=True)
+    app.run(host='0.0.0.0', port=PORT_NUM, threaded=True)
