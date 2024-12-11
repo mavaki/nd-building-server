@@ -68,7 +68,8 @@ app = Flask(__name__)
 
 # Load class indices from test generator
 def get_class_indices():
-    test_dir = '/home/ec2-user/training_images'
+    # for AWS server
+    test_dir = 'training_images'
     test_datagen = ImageDataGenerator(rescale=1.0 / 255)
     test_generator = test_datagen.flow_from_directory(
         test_dir,
@@ -83,7 +84,7 @@ class_indices = get_class_indices()
 class_labels = {v: k for k, v in class_indices.items()}
 
 # Generate images folder and subfolders to store new data
-IMAGE_FOLDER = '/home/ec2-user/training_images'
+IMAGE_FOLDER = 'training_images'
 for class_label in class_labels.values():
     subfolder = os.path.join(IMAGE_FOLDER, class_label)
     os.makedirs(subfolder, exist_ok=True)
