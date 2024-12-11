@@ -155,7 +155,7 @@ def submit():
     # Validate label
     if not label:
         return jsonify({'error': 'Label is required'}), 400
-    if label not in class_names.values():
+    if label not in class_labels.values():
         return jsonify({'error': 'Class does not exist'}), 400
 
     # Save image in appropriate class folder
