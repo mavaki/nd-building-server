@@ -1,3 +1,4 @@
 __pycache__/
 model_*.h5
 !model_0.h5
+nohup.out

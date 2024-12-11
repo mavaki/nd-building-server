@@ -52,12 +52,16 @@ MODEL_TIMESTAMP = timestamp
 
 # Remove old models
 for model, timestamp in models:
-    if timestamp != MODEL_TIMESTAMP and timestamp != '0':
+    if timestamp != MODEL_TIMESTAMP and timestamp != 0:
         os.remove(model)
 
 # Load building classifier model
 model = load_model(newest_model)
-print(f'Loaded model with timestamp {MODEL_TIMESTAMP}')
+
+second_timestamp = MODEL_TIMESTAMP / 1e9
+time_info = time.gmtime(second_timestamp)
+formatted_timestamp = time.strftime("%m-%d-%Y %H:%M:%S", time_info)
+print(f'Loaded model from {formatted_timestamp} UTC')
 
 # Create Flask app
 app = Flask(__name__)
@@ -155,15 +159,15 @@ def submit():
     # Validate label
     if not label:
         return jsonify({'error': 'Label is required'}), 400
-    if label not in class_names.values():
+    if label not in class_labels.values():
         return jsonify({'error': 'Class does not exist'}), 400
 
     # Save image in appropriate folder
     save_dir = os.path.join(IMAGE_FOLDER, label)
     os.makedirs(save_dir, exist_ok=True)
 
-    timestamp = str(time.time()).replace('.', '')
-    image_filename = os.path.join(save_dir, f"new_{timestamp}.jpg")
+    timestamp = str(time.time_ns()).replace('.', '')
+    image_filename = os.path.join(save_dir, f"{timestamp}.jpg")
     image.save(image_filename)
 
     return jsonify({
@@ -179,7 +183,11 @@ def training_data_check():
     image_count = 0
     for class_label in class_labels.values():
         subfolder = os.path.join(IMAGE_FOLDER, class_label)
-        image_count += sum(os.path.isfile(os.path.join(subfolder, f)) and f.startswith("new") for f in os.listdir(subfolder)) 
+        for entry in os.listdir(subfolder):
+            if os.path.isfile(os.path.join(subfolder, entry)) and entry.endswith('.jpg'):
+                timestamp = entry.rsplit('.jpg', 1)[0]
+                if timestamp.isdigit() and int(timestamp) > MODEL_TIMESTAMP:
+                    image_count += 1
 
     return jsonify({'new-image-count': image_count}), 200
 
@@ -219,7 +227,7 @@ def update_model():
     old_timestamp = MODEL_TIMESTAMP
     model = load_model(output_path)
     MODEL_TIMESTAMP = int(filename[6:-3])
-    if old_timestamp != '0':
+    if old_timestamp != 0:
         os.remove(os.path.join(".", f"model_{old_timestamp}.h5"))
 
     return jsonify({"message": "model updated succesfully"}), 200
