@@ -19,13 +19,13 @@ def predict_image(model, img_path, class_indices):
     return class_labels[predicted_class], predictions[0]
 
 if __name__ == "__main__":
-    # Path to your test images
+    # Path to test images
     test_dir = '/home/ec2-user/training_images'
 
-    # Load the trained model
+    # Load trained model
     model = tf.keras.models.load_model("../building_classifier_model.h5")
 
-    # Preprocess the test data
+    # Preprocess test data
     test_datagen = ImageDataGenerator(rescale=1.0/255)
 
     test_generator = test_datagen.flow_from_directory(
@@ -33,10 +33,10 @@ if __name__ == "__main__":
         target_size=(224, 224),
         batch_size=16,
         class_mode='categorical',
-        shuffle=False  # Ensure the order is consistent for predictions
+        shuffle=False
     )
 
-    # Evaluate the model on the test set
+    # Evaluate model on the test set
     #test_loss, test_accuracy = model.evaluate(test_generator)
     #print(f"Test Accuracy: {test_accuracy * 100:.2f}%")
 
