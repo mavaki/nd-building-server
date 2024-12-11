@@ -55,14 +55,14 @@ for model, timestamp in models:
     if timestamp != MODEL_TIMESTAMP and timestamp != '0':
         os.remove(model)
 
-# Load the building classifier model
+# Load building classifier model
 model = load_model(newest_model)
 print(f'Loaded model with timestamp {MODEL_TIMESTAMP}')
 
-# Define a Flask app
+# Create Flask app
 app = Flask(__name__)
 
-# Load class indices from the test generator
+# Load class indices from test generator
 def get_class_indices():
     test_dir = '/home/ec2-user/training_images'
     test_datagen = ImageDataGenerator(rescale=1.0 / 255)
@@ -78,7 +78,7 @@ def get_class_indices():
 class_indices = get_class_indices()
 class_labels = {v: k for k, v in class_indices.items()}
 
-# Generate images folder and subfolders to store new training data
+# Generate images folder and subfolders to store new data
 IMAGE_FOLDER = '/home/ec2-user/training_images'
 for class_label in class_labels.values():
     subfolder = os.path.join(IMAGE_FOLDER, class_label)
@@ -87,7 +87,7 @@ for class_label in class_labels.values():
 def predict_image(model, img_path):
     """Predict the class of the given image using the loaded model."""
     try:
-        # Load and preprocess the image
+        # Load/preprocess the image
         img = load_img(img_path, target_size=(224, 224))
         img_array = img_to_array(img) / 255.0  # Normalize to [0, 1]
         img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
@@ -129,7 +129,7 @@ def classify():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
-        # Clean up
+        # Remove image
         os.remove(image_filename)
 
 def zip_folder(folder_path):
@@ -158,7 +158,7 @@ def submit():
     if label not in class_names.values():
         return jsonify({'error': 'Class does not exist'}), 400
 
-    # Save image in appropriate class folder
+    # Save image in appropriate folder
     save_dir = os.path.join(IMAGE_FOLDER, label)
     os.makedirs(save_dir, exist_ok=True)
 
