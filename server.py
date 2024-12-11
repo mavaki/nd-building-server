@@ -1,11 +1,13 @@
 import os
 import time
 import numpy as np
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import threading, subprocess, socket, json
+import io
+import zipfile
 
 def register_with_catalog(name, port):
     # Recall function every 60 seconds
@@ -31,8 +33,31 @@ def register_with_catalog(name, port):
 ip = subprocess.run(['dig', 'ANY','+short', '@resolver2.opendns.com', 'myip.opendns.com'], capture_output=True, text=True).stdout.strip()
 register_with_catalog(ip, '8080')
 
+def find_models():
+    models = []
+    for file in os.listdir('.'):
+        if file.startswith('model_') and file.endswith('.h5'):
+            try:
+                timestamp = int(file[6:-3])
+                models.append((file, timestamp))
+            except ValueError:
+                continue
+
+    return models
+
+# Find the building classifier model
+models = find_models()
+newest_model, timestamp = sorted(models, key=lambda model_info: model_info[1])[-1]
+MODEL_TIMESTAMP = timestamp
+
+# Remove old models
+for model, timestamp in models:
+    if timestamp != MODEL_TIMESTAMP and timestamp != '0':
+        os.remove(model)
+
 # Load the building classifier model
-model = load_model("building_classifier_model.h5")
+model = load_model(newest_model)
+print(f'Loaded model with timestamp {MODEL_TIMESTAMP}')
 
 # Define a Flask app
 app = Flask(__name__)
@@ -54,7 +79,7 @@ class_indices = get_class_indices()
 class_labels = {v: k for k, v in class_indices.items()}
 
 # Generate images folder and subfolders to store new training data
-IMAGE_FOLDER = '/home/ec2-user/images'
+IMAGE_FOLDER = '/home/ec2-user/training_images'
 for class_label in class_labels.values():
     subfolder = os.path.join(IMAGE_FOLDER, class_label)
     os.makedirs(subfolder, exist_ok=True)
@@ -107,6 +132,17 @@ def classify():
         # Clean up
         os.remove(image_filename)
 
+def zip_folder(folder_path):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, start=folder_path)  # Preserve folder structure
+                zip_file.write(file_path, arcname)
+    zip_buffer.seek(0)
+    return zip_buffer
+
 @app.route('/submit', methods=['POST'])
 def submit():
     """Save given image and label to directory for future model training."""
@@ -127,12 +163,66 @@ def submit():
     os.makedirs(save_dir, exist_ok=True)
 
     timestamp = str(time.time()).replace('.', '')
-    image_filename = os.path.join(save_dir, f"{timestamp}.jpg")
+    image_filename = os.path.join(save_dir, f"new_{timestamp}.jpg")
     image.save(image_filename)
 
     return jsonify({
         'message': 'Image added to training data'
     }), 200
 
+@app.route('/training-data-check', methods=['GET'])
+def training_data_check():
+    if not os.path.exists(IMAGE_FOLDER):
+        return jsonify({"new-image-count": 0})
+
+    # Count how many images have been received 
+    image_count = 0
+    for class_label in class_labels.values():
+        subfolder = os.path.join(IMAGE_FOLDER, class_label)
+        image_count += sum(os.path.isfile(os.path.join(subfolder, f)) and f.startswith("new") for f in os.listdir(subfolder)) 
+
+    return jsonify({'new-image-count': image_count}), 200
+
+@app.route('/training-data', methods=['GET'])
+def training_data():
+    if not os.path.exists(IMAGE_FOLDER):
+        return jsonify({"error": 0})
+
+    # Zip the training data
+    zip_data = zip_folder(IMAGE_FOLDER)
+    return send_file(
+        zip_data,
+        mimetype='application/zip',
+    ), 200
+
+@app.route('/update-model', methods=['POST'])
+def update_model():
+    if 'model' not in request.files:
+        return jsonify({"error": "please include the new model"}), 400
+
+    new_model = request.files['model']
+    filename = new_model.filename
+
+    print(f'New model received with name {filename}')
+
+    global model
+    global MODEL_TIMESTAMP
+
+    if not new_model or filename == '' or filename.rsplit('.', 1)[1].lower() != 'h5':
+        return jsonify({"error": "invalid model"}), 400
+    if 'model_' not in filename or not filename[6:-3].isdigit() or int(filename[6:-3]) < MODEL_TIMESTAMP:
+        return jsonify({"error": "outdated model"}), 400
+
+    output_path = os.path.join(".", filename)
+    new_model.save(output_path)
+
+    old_timestamp = MODEL_TIMESTAMP
+    model = load_model(output_path)
+    MODEL_TIMESTAMP = int(filename[6:-3])
+    if old_timestamp != '0':
+        os.remove(os.path.join(".", f"model_{old_timestamp}.h5"))
+
+    return jsonify({"message": "model updated succesfully"}), 200
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    app.run(host='0.0.0.0', port=8080, threaded=True)
